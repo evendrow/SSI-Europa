@@ -21,7 +21,10 @@
 
 #define SerialDebug true  // Set to true to get Serial output for debugging
 
-#define SAMPLERATE_DELAY_MS (1000)
+#define SAMPLERATE_DELAY_MS (100)
+#define SERIALDEBUG_RATE (20)
+
+int sampleTimer = 0;
 
 int NICHROME_PIN = 5;
 int nichromeCounter = 0;
@@ -29,9 +32,6 @@ bool cutting = false;
 bool hasCut = false;
 
 //-------------------------------------- Define data structures for sensor data transfer
-typedef struct {
-  double temp;
-} Thermo_t;
 
 typedef struct {
   float sats;
@@ -64,31 +64,19 @@ typedef struct {
 
 //-------------------------------------- Define global sensor variables
  
-Thermo_t thermo = {-1};
 GPS_t gps = {-1, -1};
 Alt_t altimiter = {-1, -1, -1};
 Accel_t accel = {-1, -1, -1};
 BMP_t bmp = {-1, -1, -1};
 
-
-//--------------------------------------
-// Create a thermocouple instance with software SPI 
-// on any three digital IO pins.
-//#define MAXDO   7//12
-//#define MAXCS   21//9//10
-//#define MAXCLK  14//13
-//
-//// Initialize the Thermocouple
-//Adafruit_MAX31855 thermocouple(MAXCLK, MAXCS, MAXDO);
-
 //--------------------------------------
 
 //--------------------------------------
 //Create temp/pressure sensor with software SPI
-#define BMP_SCK   13
-#define BMP_MISO  12
-#define BMP_MOSI  11
-#define BMP_CS    8
+#define BMP_SCK   14
+#define BMP_MISO  8
+#define BMP_MOSI  7
+#define BMP_CS    9
 
 //Adafruit_BMP280 bmp; // I2C
 //Adafruit_BMP280 bmp(BMP_CS); // hardware SPI
@@ -231,14 +219,21 @@ void loop() {
   updateSensorData();
 
   if (SerialDebug) {
-    logDataToConsole();
+    if (sampleTimer >= SERIALDEBUG_RATE) {
+      logDataToConsole();
+      Serial.println("");
+      sampleTimer = 0;
+    }
+    sampleTimer++;
   }
+
+  logDataToSD();
 
   // Delay the next loop by a predetermined sample rate
   // We use smartdelay() instead of delay() because we need to constantly
   // update the GPS library with info from the serial ports
   smartdelay(SAMPLERATE_DELAY_MS);
-  delay(1000);
+//  delay(1000);
 }
 
 /*
@@ -260,10 +255,6 @@ static void smartdelay(unsigned long ms)
  * Takes data from varous sensor input data structure and logs to serial
  */
 void logDataToConsole() {
-  //Log thermo data
-  String thermoLog = "[THERMO] C: ";
-  thermoLog += thermo.temp;
-  Serial.println(thermoLog);
   
   //Log bmp data
   Serial.print("[BMP280] Temperature = ");
@@ -277,18 +268,6 @@ void logDataToConsole() {
   Serial.print("[BMP280] Approx altitude = ");
   Serial.print(bmp.alt); // this should be adjusted to your local forcase
   Serial.println(" m");
-//  Serial.print("[ALT] Temperature = ");
-//  Serial.print(altimiter.temp);
-//  Serial.println(" *C");
-//
-//  Serial.print("[ALT] Pressure = ");
-//  Serial.print(altimiter.pressure);
-//  Serial.println(" Pa");
-//
-//  Serial.print("[ALT] Approx altitude = ");
-//  Serial.print(altimiter.alt); // this should be adjusted to your local forcase
-//  Serial.println(" m");
-
 
 
   //Log accelerometer data
@@ -299,6 +278,30 @@ void logDataToConsole() {
   Serial.print(accel.y, 4);
   Serial.print("\tZ: ");
   Serial.println(accel.z, 4);
+
+  // Print acceleration values in milligs!
+  Serial.print("[ACCEL] X-acceleration: "); Serial.print(1000 * myIMU.ax);
+  Serial.print(" mg ");
+  Serial.print("[ACCEL] Y-acceleration: "); Serial.print(1000 * myIMU.ay);
+  Serial.print(" mg ");
+  Serial.print("[ACCEL] Z-acceleration: "); Serial.print(1000 * myIMU.az);
+  Serial.println(" mg ");
+  
+  // Print gyro values in degree/sec
+  Serial.print("[ACCEL] X-gyro rate: "); Serial.print(myIMU.gx, 3);
+  Serial.print(" degrees/sec ");
+  Serial.print("[ACCEL] Y-gyro rate: "); Serial.print(myIMU.gy, 3);
+  Serial.print(" degrees/sec ");
+  Serial.print("[ACCEL] Z-gyro rate: "); Serial.print(myIMU.gz, 3);
+  Serial.println(" degrees/sec");
+
+  // Print mag values in degree/sec
+  Serial.print("[ACCEL] X-mag field: "); Serial.print(myIMU.mx);
+  Serial.print(" mG ");
+  Serial.print("[ACCEL] Y-mag field: "); Serial.print(myIMU.my);
+  Serial.print(" mG ");
+  Serial.print("[ACCEL] Z-mag field: "); Serial.print(myIMU.mz);
+  Serial.println(" mG");
 
   //Log GPS data
   Serial.print("[GPS] ");
@@ -327,7 +330,6 @@ void logDataToSD() {
   // Here we create a single line to input into the log file
   String dataLog = "";
   dataLog += millis();        dataLog += ","; // Timestamp
-  dataLog += thermo.temp;     dataLog += ","; // Thermocouple temperature
   
   dataLog += altimiter.temp;        dataLog += ","; // Altimiter temperature
   dataLog += altimiter.pressure;    dataLog += ","; // Altimiter pressure
@@ -336,6 +338,14 @@ void logDataToSD() {
   dataLog += accel.x;         dataLog += ","; // Accelerometer x
   dataLog += accel.y;         dataLog += ","; // Accelerometer y
   dataLog += accel.z;         dataLog += ","; // Accelerometer z
+
+  dataLog += myIMU.gx;         dataLog += ","; // Accelerometer gyro x
+  dataLog += myIMU.gy;         dataLog += ","; // Accelerometer gyro y
+  dataLog += myIMU.gz;         dataLog += ","; // Accelerometer gyro z
+
+  dataLog += myIMU.mx;         dataLog += ","; // Accelerometer mag x
+  dataLog += myIMU.my;         dataLog += ","; // Accelerometer mag y
+  dataLog += myIMU.mz;         dataLog += ","; // Accelerometer mag z
 
   dataLog += gps.sats;        dataLog += ","; // GPS satellites
   dataLog += gps.precision;   dataLog += ","; // GPS reading precision
@@ -349,8 +359,8 @@ void logDataToSD() {
   dataLog += gps.speed__kmph; dataLog += ",";  //GPS speed (kmph)
   dataLog += gps.checksum; //dataLog += ",";   //GPS # of checksum fails
 
-  Serial.println(dataLog);
-  Serial.println("");
+//  Serial.println(dataLog);
+//  Serial.println("");
   
   // Write the log to the log file
   // The log file is in CSV format for easy data analysis
@@ -469,7 +479,7 @@ void updateGPSData() {
 //  print_int(chars, 0xFFFFFFFF, 10);
 //  print_int(sentences, 0xFFFFFFFF, 10);
 //  print_int(failed, 0xFFFFFFFF, 10);
-  Serial.println();
+//  Serial.println();
   
 }
 
@@ -497,7 +507,6 @@ void updateAccelData() {
   // If intPin goes high, all data registers have new data
   // On interrupt, check if data ready interrupt
   if (myIMU.readByte(MPU9250_ADDRESS, INT_STATUS) & 0x01) {
-    Serial.print("[ALT] Getting new data");
     
     myIMU.readAccelData(myIMU.accelCount);  // Read the x/y/z adc values
   
@@ -555,39 +564,15 @@ void updateAccelData() {
     myIMU.delt_t = millis() - myIMU.count;
     if (myIMU.delt_t > 500)
     {
-      if(SerialDebug)
-      {
-        // Print acceleration values in milligs!
-        Serial.print("X-acceleration: "); Serial.print(1000 * myIMU.ax);
-        Serial.print(" mg ");
-        Serial.print("Y-acceleration: "); Serial.print(1000 * myIMU.ay);
-        Serial.print(" mg ");
-        Serial.print("Z-acceleration: "); Serial.print(1000 * myIMU.az);
-        Serial.println(" mg ");
-        
-        // Print gyro values in degree/sec
-        Serial.print("X-gyro rate: "); Serial.print(myIMU.gx, 3);
-        Serial.print(" degrees/sec ");
-        Serial.print("Y-gyro rate: "); Serial.print(myIMU.gy, 3);
-        Serial.print(" degrees/sec ");
-        Serial.print("Z-gyro rate: "); Serial.print(myIMU.gz, 3);
-        Serial.println(" degrees/sec");
-  
-        // Print mag values in degree/sec
-        Serial.print("X-mag field: "); Serial.print(myIMU.mx);
-        Serial.print(" mG ");
-        Serial.print("Y-mag field: "); Serial.print(myIMU.my);
-        Serial.print(" mG ");
-        Serial.print("Z-mag field: "); Serial.print(myIMU.mz);
-        Serial.println(" mG");
-  
-        myIMU.tempCount = myIMU.readTempData();  // Read the adc values
-        // Temperature in degrees Centigrade
-        myIMU.temperature = ((float) myIMU.tempCount) / 333.87 + 21.0;
-        // Print temperature in degrees Centigrade
-        Serial.print("Temperature is ");  Serial.print(myIMU.temperature, 1);
-        Serial.println(" degrees C");
-      }
+//      if(SerialDebug)
+//      {
+//        myIMU.tempCount = myIMU.readTempData();  // Read the adc values
+//        // Temperature in degrees Centigrade
+//        myIMU.temperature = ((float) myIMU.tempCount) / 333.87 + 21.0;
+//        // Print temperature in degrees Centigrade
+//        Serial.print("Temperature is ");  Serial.print(myIMU.temperature, 1);
+//        Serial.println(" degrees C");
+//      }
   
       myIMU.count = millis();
     } // if (myIMU.delt_t > 500)
