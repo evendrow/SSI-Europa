@@ -27,9 +27,14 @@
 int sampleTimer = 0;
 
 int NICHROME_PIN = 5;
+int NICHROME_DELAY_MS = 1000;
 int nichromeCounter = 0;
-bool cutting = false;
-bool hasCut = false;
+bool deploying = false;
+bool hasDeployed = false;
+
+float initialAltitude = -1;
+float lastAlt = 0;
+float vertSpeed = 0;
 
 //-------------------------------------- Define data structures for sensor data transfer
 
@@ -69,10 +74,7 @@ Alt_t altimiter = {-1, -1, -1};
 Accel_t accel = {-1, -1, -1};
 BMP_t bmp = {-1, -1, -1};
 
-//--------------------------------------
-
-//--------------------------------------
-//Create temp/pressure sensor with software SPI
+//-------------------------------------- Create temp/pressure sensor with software SPI
 #define BMP_SCK   14
 #define BMP_MISO  8
 #define BMP_MOSI  7
@@ -81,7 +83,6 @@ BMP_t bmp = {-1, -1, -1};
 //Adafruit_BMP280 bmp; // I2C
 //Adafruit_BMP280 bmp(BMP_CS); // hardware SPI
 Adafruit_BMP280 bmpChip(BMP_CS, BMP_MOSI, BMP_MISO,  BMP_SCK);
-//--------------------------------------
 
 //-------------------------------------- Initialize Accelerometer
 
@@ -105,17 +106,12 @@ int intPin = 2;  // These can be changed, 2 and 3 are the Arduinos ext int pins
 MPU9250 myIMU(MPU9250_ADDRESS, I2Cport, I2Cclock);
 
 //-------------------------------------- Initialize GPS
-
 TinyGPS gpsChip;
 SoftwareSerial ss(0, 1);
-
 //-------------------------------------- Initialize Baraometer/Altimiter
-
 //Create an instance of the object
 MPL3115A2 myPressure;
-
 //--------------------------------------  SD Card setup
-
 // Set USE_SDIO to zero for SPI card access. 
 #define USE_SDIO 0
 
@@ -161,8 +157,9 @@ unsigned long transmissionTime = 0;
 void setup()
 {
 
-//  pinMode(NICHROME_PIN, OUTPUT);
-//  digitalWrite(NICHROME_PIN, LOW);
+  //Nichrome pin used for wing deployment
+  pinMode(NICHROME_PIN, OUTPUT);
+  digitalWrite(NICHROME_PIN, LOW);
   
   //Set SPI IO pins
   SPI.setMOSI(11); //DO pin; connected to DI on the sd reader.
@@ -199,6 +196,10 @@ void setup()
     readFileToConsole("test.txt");
     Serial.println("---------");
   }
+
+  //set initial altitude
+  initialAltitude = bmpChip.readAltitude(1013.25);
+  lastAlt = initialAltitude;
 }
 
 void setupAltimiter() {
@@ -217,6 +218,34 @@ void setupAltimiter() {
 void loop() {
 
   updateSensorData();
+  logDataToSD();
+
+  //if is deploying (i.e. cutting) currently, stop if exceeds timer
+  if (deploying) {
+    nichromeCounter += SAMPLERATE_DELAY_MS;
+    if (nichromeCounter >= NICHROME_DELAY_MS) {
+      digitalWrite(NICHROME_PIN, LOW);
+      deploying = false;
+    }
+  }
+
+  //use exponential moving average to get last vertical speed
+  //https://en.wikipedia.org/wiki/Moving_average#Exponential_moving_average
+  float alpha = 0.4; //a higher alpha discounts older observations faster
+  float newVertSpeed = (bmp.alt - lastAlt) / (float)(SAMPLERATE_DELAY_MS) / 1000.0;
+  vertSpeed = alpha * newVertSpeed + (1.0-alpha)*vertSpeed;
+
+  //if hasn't deployed already, check for met conditions
+  if (!hasDeployed) {
+    //Conditions for wing deployment (altitude and vertical speed)
+    if (bmp.alt > initialAltitude + 1000 && vertSpeed < 0) {
+      hasDeployed = true;
+      deploying = true;
+      digitalWrite(NICHROME_PIN, HIGH);
+    }
+  }
+
+  
 
   if (SerialDebug) {
     if (sampleTimer >= SERIALDEBUG_RATE) {
@@ -227,7 +256,7 @@ void loop() {
     sampleTimer++;
   }
 
-  logDataToSD();
+  
 
   // Delay the next loop by a predetermined sample rate
   // We use smartdelay() instead of delay() because we need to constantly
@@ -670,27 +699,6 @@ void updateAltimiterData() {
   altimiter.alt = myPressure.readAltitude();
   altimiter.pressure = myPressure.readPressure();
   altimiter.temp = myPressure.readTemp();
-
-  
-//  Serial.print("Altitude(m):");
-//  Serial.print(altitude, 2);
-
-//  float altitude = myPressure.readAltitudeFt();
-//  Serial.print(" Altitude(ft):");
-//  Serial.print(altitude, 2);
-
-//  float pressure = myPressure.readPressure();
-//  Serial.print("Pressure(Pa):");
-//  Serial.print(pressure, 2);
-
-  //float temperature = myPressure.readTemp();
-  //Serial.print(" Temp(c):");
-  //Serial.print(temperature, 2);
-
-//  float temperature = myPressure.readTempF();
-//  Serial.print(" Temp(f):");
-//  Serial.print(temperature, 2);
-//  Serial.println();
 }
 
 /*
