@@ -2,7 +2,7 @@
  * This code was used for SSI's Project Europa mission.
  * The code monitors data from various sensors and records it to an SD card.
  * 
- * Edward Vendrow, Paxton Scott
+ * Edward Vendrow, Paxton Scott, Scott Maran
  * Project Europa
  */
 
@@ -13,6 +13,7 @@
 #include <Wire.h>               //altimiter
 #include "SparkFunMPL3115A2.h"  //altimiter
 #include <Adafruit_BMP280.h>    //temp/pressure (BMP280)
+#include <Servo.h> 
 
 #include <SoftwareSerial.h>
 #include <TinyGPS.h>
@@ -35,6 +36,12 @@ bool hasDeployed = false;
 float initialAltitude = -1;
 float lastAlt = 0;
 float vertSpeed = 0;
+
+Servo left_elevator;
+Servo right_elevator;
+int servo_angle = 90;
+int servo_max_angle = servo_angle + servo_max_change;
+int servo_max_change = 15;
 
 //-------------------------------------- Define data structures for sensor data transfer
 
@@ -156,6 +163,11 @@ unsigned long transmissionTime = 0;
 
 void setup()
 {
+  
+  
+  //attach servos
+  left_elevator.attach(3);
+  right_elevator.attach(4);
 
   //Nichrome pin used for wing deployment
   pinMode(NICHROME_PIN, OUTPUT);
@@ -170,7 +182,7 @@ void setup()
   Serial.begin(9600);
 
   //UNCOMMENT THIS if working on computer; comment out if powering on battery
-  while (!Serial) { delay(1); }
+  //while (!Serial) { delay(1); }
 
   //If SD fails to initialize, crash :(
   if (!initializeSd()) { return; }
@@ -244,7 +256,16 @@ void loop() {
       digitalWrite(NICHROME_PIN, HIGH);
     }
   }
-
+  
+  //only turn servos if the wings have deployed
+  if(hasDeployed) {
+    //keep increasing the servo angle by one until it reaches the max angle 
+    if(servo_angle < servo_max_angle) {
+        right_elevator.write(servo_angle);
+        left_elevator.write(servo_angle);
+        servo_angle = servo_angle + 1;
+    }
+  }
   
 
   if (SerialDebug) {
