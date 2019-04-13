@@ -385,17 +385,17 @@ void logDataToSD() {
   dataLog += altimiter.pressure;    dataLog += ","; // Altimiter pressure
   dataLog += altimiter.alt;         dataLog += ","; // Altimiter altitude
   
-  dataLog += accel.x;         dataLog += ","; // Accelerometer x
-  dataLog += accel.y;         dataLog += ","; // Accelerometer y
-  dataLog += accel.z;         dataLog += ","; // Accelerometer z
+  dataLog += String(accel.x, 4);         dataLog += ","; // Accelerometer x
+  dataLog += String(accel.y, 4);         dataLog += ","; // Accelerometer y
+  dataLog += String(accel.z, 4);         dataLog += ","; // Accelerometer z
 
-  dataLog += myIMU.gx;         dataLog += ","; // Accelerometer gyro x
-  dataLog += myIMU.gy;         dataLog += ","; // Accelerometer gyro y
-  dataLog += myIMU.gz;         dataLog += ","; // Accelerometer gyro z
+  dataLog += String(myIMU.gx, 4);         dataLog += ","; // Accelerometer gyro x
+  dataLog += String(myIMU.gy, 4);         dataLog += ","; // Accelerometer gyro y
+  dataLog += String(myIMU.gz, 4);         dataLog += ","; // Accelerometer gyro z
 
-  dataLog += myIMU.mx;         dataLog += ","; // Accelerometer mag x
-  dataLog += myIMU.my;         dataLog += ","; // Accelerometer mag y
-  dataLog += myIMU.mz;         dataLog += ","; // Accelerometer mag z
+  dataLog += String(myIMU.mx, 4);         dataLog += ","; // Accelerometer mag x
+  dataLog += String(myIMU.my, 4);         dataLog += ","; // Accelerometer mag y
+  dataLog += String(myIMU.mz, 4);         dataLog += ","; // Accelerometer mag z
 
   dataLog += gps.sats;        dataLog += ","; // GPS satellites
   dataLog += gps.precision;   dataLog += ","; // GPS reading precision
