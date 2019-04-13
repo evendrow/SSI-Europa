@@ -40,7 +40,8 @@ float vertSpeed = 0;
 Servo left_elevator;
 Servo right_elevator;
 int servo_angle = 90;
-int servo_max_angle = servo_angle + 10;
+int servo_max_angle = servo_angle + servo_max_change;
+int servo_max_change = 15;
 
 //-------------------------------------- Define data structures for sensor data transfer
 
@@ -181,7 +182,7 @@ void setup()
   Serial.begin(9600);
 
   //UNCOMMENT THIS if working on computer; comment out if powering on battery
-  while (!Serial) { delay(1); }
+  //while (!Serial) { delay(1); }
 
   //If SD fails to initialize, crash :(
   if (!initializeSd()) { return; }
